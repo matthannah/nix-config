@@ -4,11 +4,19 @@
 
 { config, pkgs, ... }:
 
-{
+let
+  nixpkgs = import ./nixpkgs.nix;
+
+in {
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
+
+   nix.nixPath = [
+    "nixpkgs=${nixpkgs}"
+    "nixos-config=/etc/nixos/configuration.nix"
+  ];
 
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;

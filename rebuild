@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+nixpkgs_path=$(nix eval --raw '(import /etc/nixos/nixpkgs.nix)')
+export NIX_PATH="nixpkgs=${nixpkgs_path}:nixos-config=/etc/nixos/configuration.nix"
+
+nixos-rebuild "$@"
