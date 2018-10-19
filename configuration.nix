@@ -32,6 +32,31 @@ in {
     }
   ];
 
+  
+  # PG Container config start.
+  containers.pg = {
+    bindMounts."/home" = { hostPath = "/data/pg-container"; isReadOnly = false; };
+    privateNetwork = true;
+    hostAddress = "192.168.100.10";
+    localAddress = "192.168.100.11";
+    config = { config, lib, pkgs, ... }: with lib; {
+      boot.isContainer = true;
+      networking.useDHCP = false;
+      services.postgresql = {
+        enable = true;
+        enableTCPIP = true;
+        authentication = "host all all 0.0.0.0/0 trust";
+      };
+      networking.firewall.allowedTCPPorts = [ 5432 ];
+    };
+  };
+
+  networking.nat.enable = true;
+  networking.nat.internalInterfaces = ["ve-+"];
+  networking.nat.externalInterface = "192.168.100.10";
+  networking.networkmanager.unmanaged = [ "interface-name:ve-*" ];
+  # PG Container config end.
+
   hardware = {
     nvidia.modesetting.enable = true;
     nvidia.optimus_prime.enable = true;

@@ -9,13 +9,6 @@ let
     sha256 = "1z4cchcw7qgjhy0x6mnz7iqvpswc2nfjpdynxc54zpm66khfrjqw";
   }) {};
 
-  hie-nix = pkgs.callPackage (pkgs.fetchFromGitHub {
-    owner = "domenkozar";
-    repo = "hie-nix";
-    rev = "8f04568aa8c3215f543250eb7a1acfa0cf2d24ed";
-    sha256 = "06ygnywfnp6da0mcy4hq0xcvaaap1w3di2midv1w9b9miam8hdrn";
-  }) {};
-
 in {
   nixpkgs.config.allowUnfree = true;
 
@@ -29,7 +22,6 @@ in {
     gnumake
     gnupg
     google-chrome
-    hie-nix.hie82
     htop
     networkmanagerapplet
     nmap
