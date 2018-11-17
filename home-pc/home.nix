@@ -18,6 +18,7 @@
     unzip
     vlc
     vscode
+    xclip
     xscreensaver
     zip
   ];
