@@ -32,7 +32,6 @@ in {
     }
   ];
 
-  
   # PG Container config start.
   containers.pg = {
     bindMounts."/home" = { hostPath = "/data/pg-container"; isReadOnly = false; };
@@ -47,12 +46,13 @@ in {
         enableTCPIP = true;
         authentication = "host all all 0.0.0.0/0 trust";
       };
+      services.postgresql.package = pkgs.postgresql100;
       networking.firewall.allowedTCPPorts = [ 5432 ];
     };
   };
 
   networking.nat.enable = true;
-  networking.nat.internalInterfaces = ["ve-+"];
+  networking.nat.internalInterfaces = [ "ve-+" ];
   networking.nat.externalInterface = "192.168.100.10";
   networking.networkmanager.unmanaged = [ "interface-name:ve-*" ];
   # PG Container config end.
@@ -64,6 +64,7 @@ in {
     nvidia.optimus_prime.intelBusId = "PCI:0:2:0";
     bluetooth.enable = true;
     enableAllFirmware = true;
+    opengl.driSupport32Bit = true;
   };
 
   # networking.hostName = "nixos"; # Define your hostname.
@@ -82,11 +83,11 @@ in {
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-    coreutils
-    glxinfo
-    lshw
+    curl
+    file
+    git
+    ncat
     nix-prefetch-scripts
-    pciutils
     vim
     which
   ];
@@ -121,8 +122,8 @@ in {
   services.xserver.layout = "us";
   services.xserver.xkbOptions = "eurosign:e";
 
-  services.xserver.videoDrivers = ["nvidia"];
-  
+  services.xserver.videoDrivers = [ "nvidia" ];
+
   services.xserver.displayManager.sddm.enable = true;
 
   # Enable touchpad support.
@@ -140,6 +141,10 @@ in {
     xfce.enable = true;
   };
 
+  # Resolve conflict between KDE and XFCE modules
+  environment.variables.GDK_PIXBUF_MODULE_FILE = pkgs.lib.mkForce "${pkgs.librsvg.out}/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache";
+
+  # Virtualbox.
   virtualisation.virtualbox.host.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
