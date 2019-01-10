@@ -47,19 +47,19 @@ in {
   ];
 
 
-  programs.zsh.enable = true;
-
-  programs.zsh.shellAliases = {
-    ns = "nix-shell --command 'zsh'";
-  };
-
-  programs.zsh.oh-my-zsh = {
+  programs.zsh = {
     enable = true;
-    plugins = [
-      "git"
-    ];
-    custom = "${zshCustom}";
-    theme = "robbyrussell";
+    shellAliases = {
+      ns = "nix-shell --command 'zsh'";
+    };
+    oh-my-zsh = {
+      enable = true;
+      plugins = [
+        "git"
+      ];
+      custom = "${zshCustom}";
+      theme = "robbyrussell";
+    };
   };
 
   programs.git = {
@@ -83,6 +83,8 @@ in {
 
   services.unclutter.enable = true;
 
-  programs.home-manager.enable = true;
-  programs.home-manager.path = https://github.com/rycee/home-manager/archive/master.tar.gz;
+  programs.home-manager = {
+    enable = true;
+    path = https://github.com/rycee/home-manager/archive/release-18.09.tar.gz;
+  };
 }
