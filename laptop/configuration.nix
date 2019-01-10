@@ -80,6 +80,20 @@ in {
   # Set your time zone.
   time.timeZone = "Australia/Melbourne";
 
+  networking.wireguard.interfaces.wg0 = {
+    ips = [ "10.100.0.10/32" ];
+    privateKeyFile = "/home/matt/wg-matt.key";
+    peers = [
+      {
+        endpoint = "build-vpn.daiseelabs.com:8083";
+        publicKey = "DgFLw//BuU60Y+NMmnQ9D3kS1qDCqt4CB+Ep8yunZHs=";
+        allowedIPs = [ "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16" ];
+        persistentKeepalive = 25;
+      }
+    ];
+  };
+  networking.hosts."10.6.3.236" = [ "lisa-acme.daiseelabs.com" ];
+
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
