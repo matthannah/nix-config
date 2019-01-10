@@ -1,38 +1,30 @@
 {config, pkgs, ...}:
 
 let
-
-  unstablePkgs = import (pkgs.fetchFromGitHub {
+  unstable = import (pkgs.fetchFromGitHub {
     owner = "NixOS";
     repo = "nixpkgs-channels";
-    rev = "a8c71037e041725d40fbf2f3047347b6833b1703";
-    sha256 = "1z4cchcw7qgjhy0x6mnz7iqvpswc2nfjpdynxc54zpm66khfrjqw";
+    rev = "80738ed9dc0ce48d7796baed5364eef8072c794d";
+    sha256 = "0anmvr6b47gbbyl9v2fn86mfkcwgpbd5lf0yf3drgm8pbv57c1dc";
   }) {};
-
 in {
   nixpkgs.config.allowUnfree = true;
 
   home.packages = with pkgs; [
-    audacity
     curl
-    emacs
-    libffi # Foreign function interface library (python bindings use them)
     git
     git-crypt
     gnumake
     gnupg
-    google-chrome
+    unstable.google-chrome
     htop
     networkmanagerapplet
     nmap
-    nodePackages.node2nix
     oh-my-zsh
-    postgresql
+    postgresql100
     slack
-    unstablePkgs.stack
     terminator
     unzip
-    virtualbox
     vlc
     vscode
     xclip
@@ -44,6 +36,10 @@ in {
     enable = true;
     enableSshSupport = true;
   };
+
+  home.file.".ghci".text = ''
+    :set prompt "\ESC[34mλ> \ESC[m"
+  '';
 
   programs.zsh.enable = true;
 
@@ -67,26 +63,6 @@ in {
     latitude = "-37.7688";
     longitude = "145.0423";
     tray = false;
-  };
-
-  systemd.user.timers.kill-hie = {
-    Install.WantedBy = [ "graphical-session.target" ];
-    Timer = {
-      OnActiveSec = "1m";
-      OnUnitActiveSec= "1m";
-    };
-  };
-
-  systemd.user.services.kill-hie = {
-    Unit.Description = "Prevent hie from eating all the RAM";
-    Install.WantedBy = [ "graphical-session.target" ];
-    Service.ExecStart =
-      let
-        script = pkgs.writeShellScriptBin "kill-hie.sh" ''
-          pid=$(${pkgs.procps}/bin/ps --no-headers -o pid,%mem -C hie | ${pkgs.gawk}/bin/awk '$2 > 60 {print $1}')
-          [ -n "$pid" ] && ${pkgs.coreutils}/bin/kill $pid || true
-        '';
-      in "${pkgs.bash}/bin/bash ${script}/bin/kill-hie.sh";
   };
 
   services.unclutter.enable = true;
