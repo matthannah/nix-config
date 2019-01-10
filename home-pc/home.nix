@@ -9,7 +9,7 @@ let
       local ret_status="%(?:%{$fg_bold[green]%}➜ :%{$fg_bold[red]%}➜ )"
 
       if [[ -v IN_NIX_SHELL ]]; then
-          PROMPT='${retStatus} nix-shell %{$fg[cyan]%}%c%{$reset_color%} $(git_prompt_info)'
+          PROMPT='${retStatus} %{$fg_bold[green]%}nix-shell %{$fg[cyan]%}%c%{$reset_color%} $(git_prompt_info)'
       else
           PROMPT='${retStatus} %{$fg[cyan]%}%c%{$reset_color%} $(git_prompt_info)'
       fi
