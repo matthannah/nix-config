@@ -1,12 +1,24 @@
 {config, pkgs, ...}:
 
 let
-  unstable = import (pkgs.fetchFromGitHub {
-    owner = "NixOS";
-    repo = "nixpkgs-channels";
-    rev = "80738ed9dc0ce48d7796baed5364eef8072c794d";
-    sha256 = "0anmvr6b47gbbyl9v2fn86mfkcwgpbd5lf0yf3drgm8pbv57c1dc";
-  }) {};
+    # Can't figure out how to escape substitution ${} when we have PROMPT='${ret_status}'.
+  retStatus = ''''${ret_status}'';
+  zshCustom = pkgs.writeTextFile {
+    name = "zsh-custom";
+    text = ''
+      local ret_status="%(?:%{$fg_bold[green]%}➜ :%{$fg_bold[red]%}➜ )"
+      if [[ -v IN_NIX_SHELL ]]; then
+          PROMPT='${retStatus} %{$fg_bold[green]%}nix-shell %{$fg[cyan]%}%c%{$reset_color%} $(git_prompt_info)'
+      else
+          PROMPT='${retStatus} %{$fg[cyan]%}%c%{$reset_color%} $(git_prompt_info)'
+      fi
+      ZSH_THEME_GIT_PROMPT_PREFIX="%{$fg_bold[blue]%}git:(%{$fg[red]%}"
+      ZSH_THEME_GIT_PROMPT_SUFFIX="%{$reset_color%} "
+      ZSH_THEME_GIT_PROMPT_DIRTY="%{$fg[blue]%}) %{$fg[yellow]%}✗"
+      ZSH_THEME_GIT_PROMPT_CLEAN="%{$fg[blue]%})"
+    '';
+    destination = "/themes/robbyrussell.zsh-theme";
+  };
 in {
   nixpkgs.config.allowUnfree = true;
 
@@ -16,7 +28,7 @@ in {
     git-crypt
     gnumake
     gnupg
-    unstable.google-chrome
+    google-chrome
     htop
     networkmanagerapplet
     nmap
@@ -41,14 +53,19 @@ in {
     :set prompt "\ESC[34mλ> \ESC[m"
   '';
 
-  programs.zsh.enable = true;
-
-  programs.zsh.oh-my-zsh = {
+  programs.zsh = {
     enable = true;
-    plugins = [
-      "git"
-    ];
-    theme = "robbyrussell";
+    shellAliases = {
+      ns = "nix-shell --command 'zsh'";
+    };
+    oh-my-zsh = {
+      enable = true;
+      plugins = [
+        "git"
+      ];
+      custom = "${zshCustom}";
+      theme = "robbyrussell";
+    };
   };
 
   programs.git = {
