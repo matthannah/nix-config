@@ -4,10 +4,25 @@
 
 { config, pkgs, ... }:
 
-{
+let
+  integrityPath = "/home/matt/projects/lisa/test/integrity";
+in {
+  # Lisa integrity overlay.
+  nixpkgs.overlays = [ (import "${integrityPath}/overlay.nix") ];
+
+  nix.binaryCaches = [
+    "https://cache.nixos.org/"
+    "https://build.daiseelabs.com"
+  ];
+  nix.binaryCachePublicKeys = [
+    "build.daiseelabs.com-1:dcDJ5/wXMie1xvW/o5TfedvVIqKG77i3dpKfamBJg8M="
+  ];
+
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
+      # Lisa integrity.
+      "${integrityPath}/module.nix"
     ];
 
   boot.initrd.luks.devices = [
@@ -21,6 +36,31 @@
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+
+  # PG Container config start.
+  containers.pg = {
+    bindMounts."/home" = { hostPath = "/home/matt/pg-container-mount"; isReadOnly = false; };
+    privateNetwork = true;
+    hostAddress = "192.168.100.10";
+    localAddress = "192.168.100.11";
+    config = { config, lib, pkgs, ... }: with lib; {
+      boot.isContainer = true;
+      networking.useDHCP = false;
+      services.postgresql = {
+        enable = true;
+        enableTCPIP = true;
+        authentication = "host all all 0.0.0.0/0 trust";
+        package = pkgs.postgresql100;
+      };
+      networking.firewall.allowedTCPPorts = [ 5432 ];
+    };
+  };
+
+  networking.nat.enable = true;
+  networking.nat.internalInterfaces = ["ve-+"];
+  networking.nat.externalInterface = "192.168.100.10";
+  networking.networkmanager.unmanaged = [ "interface-name:ve-*" ];
+  # PG Container config end.
 
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -46,6 +86,71 @@
     coreutils
     vim
   ];
+
+  # Wireguard config start.
+  networking.wireguard.interfaces.wg0 = {
+    ips = [ "10.100.0.10/32" ];
+    privateKeyFile = "/home/matt/wg-matt.key";
+    peers = [
+      {
+        endpoint = "build-vpn.daiseelabs.com:8083";
+        publicKey = "DgFLw//BuU60Y+NMmnQ9D3kS1qDCqt4CB+Ep8yunZHs=";
+        allowedIPs = [ "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16" ];
+        persistentKeepalive = 25;
+      }
+    ];
+  };
+  networking.hosts."10.6.3.236" = [ "lisa-acme.daiseelabs.com" ];
+
+  systemd.services.network-reach-global = {
+    description = "Monitor access to global Internet";
+    # Wait for network manager to declare network "online"
+    # (whatever that means)
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    # preStart check to prevent dependency flapping
+    # No timeout, rely on TimeoutStartSec
+    preStart = ''
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+      /run/wrappers/bin/ping -c1 1.1.1.1
+    '';
+    script = ''
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+      while /run/wrappers/bin/ping -c1 -W2 1.1.1.1; do sleep 25s; done
+      exit 1
+    '';
+    serviceConfig = {
+      TimeoutStartSec = "1s";
+      RestartSec = "1s";
+      Restart = "always";
+      StartLimitInterval = "0";
+    };
+  };
+  # https://github.com/NixOS/nixpkgs/issues/30459
+  systemd.services.wireguard-wg0 = {
+    requires = [ "network-reach-global.service" ];
+    after = [ "network-reach-global.service" ];
+    # This feels backwards, but it's a useful way to
+    # restart a oneshot service. "after" does the
+    # expected thing.
+    # https://github.com/systemd/systemd/issues/2582
+    wantedBy = [ "network-reach-global.service" ];
+  };
+
+  # Wireguard config end.
+
+  # Lisa integrity.
+  programs.integrity = {
+    enableWrapper = true;
+    enableInsecureNixBuilds = true;
+
+    package = (import "${integrityPath}/test.nix" {}).binary;
+  };
+
+  # Allow lisa integrity test container to run. Since it sets '__noChroot' to 'true'
+  nix.useSandbox = "relaxed";
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
@@ -87,12 +192,18 @@
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.extraUsers.matt = {
     createHome = true;
-    extraGroups = ["wheel" "video" "audio" "disk" "networkmanager"];
+    extraGroups = ["wheel" "video" "audio" "disk" "networkmanager" "integrity" ];
     group = "users";
     home = "/home/matt";
     isNormalUser = true;
     shell = pkgs.zsh;
     uid = 1000;
+  };
+
+  # Enable virtualbox.
+  virtualisation.virtualbox = {
+    host.enable = true;
+    guest.enable = true;
   };
 
   # This value determines the NixOS release with which your system is to be
