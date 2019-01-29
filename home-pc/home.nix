@@ -35,7 +35,7 @@ in {
     networkmanagerapplet
     ncat
     oh-my-zsh
-    postgresql
+    postgresql100
     slack
     terminator
     unzip
@@ -46,6 +46,9 @@ in {
     zip
   ];
 
+  home.file.".ghci".text = ''
+    :set prompt "\ESC[93mλ > \ESC[m"
+  '';
 
   programs.zsh = {
     enable = true;
@@ -82,6 +85,22 @@ in {
   };
 
   services.unclutter.enable = true;
+
+  systemd.user.services.postgres-forward = {
+    Unit.Description = "Forward PostgreSQL connections on local socket to container";
+    Install.WantedBy = [ "graphical-session.target" ];
+    Service =
+      let
+        script = pkgs.writeShellScriptBin "postgres.sh" ''
+          rm -f ${socket}
+          exec ${pkgs.nmap}/bin/ncat -lkU ${socket} --sh-exec '${pkgs.nmap}/bin/ncat 192.168.100.11 5432'
+        '';
+        socket = "/tmp/.s.PGSQL.5432";
+      in {
+        ExecStart = "${pkgs.bash}/bin/bash ${script}/bin/postgres.sh";
+        ExecStopPost = "${pkgs.coreutils}/bin/rm -f ${socket}";
+      };
+  };
 
   programs.home-manager = {
     enable = true;
