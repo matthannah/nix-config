@@ -30,12 +30,15 @@ in {
     gnupg
     google-chrome
     htop
+    iotop
     networkmanagerapplet
     nmap
     oh-my-zsh
     postgresql100
     slack
+    source-code-pro
     terminator
+    tldr
     unzip
     vlc
     vscode
@@ -43,6 +46,8 @@ in {
     xscreensaver
     zip
   ];
+
+  fonts.fontconfig.enableProfileFonts = true;
 
   services.gpg-agent = {
     enable = true;
@@ -83,6 +88,24 @@ in {
   };
 
   services.unclutter.enable = true;
+
+  # Forward a connection to a postgres container.
+  # TODO: Start container automatically and get its ip?
+  systemd.user.services.postgres-forward = {
+      Unit.Description = "Forward PostgreSQL connections on local socket to container";
+      Install.WantedBy = [ "graphical-session.target" ];
+      Service =
+        let
+          script = pkgs.writeShellScriptBin "postgres.sh" ''
+            rm -f ${socket}
+            exec ${pkgs.nmap}/bin/ncat -lkU ${socket} --sh-exec '${pkgs.nmap}/bin/ncat 192.168.100.11 5432'
+          '';
+          socket = "/tmp/.s.PGSQL.5432";
+        in {
+          ExecStart = "${pkgs.bash}/bin/bash ${script}/bin/postgres.sh";
+          ExecStopPost = "${pkgs.coreutils}/bin/rm -f ${socket}";
+        };
+    };
 
   programs.home-manager = {
     enable = true;

@@ -6,21 +6,51 @@
 
 let
   nixpkgs = import ./nixpkgs.nix;
-
+  integrityPath = "~/projects/lisa/test/integrity";
 in {
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
+      # Lisa integrity.
+      "${integrityPath}/module.nix"
     ];
 
-   nix.nixPath = [
+  nix.nixPath = [
     "nixpkgs=${nixpkgs}"
     "nixos-config=/etc/nixos/configuration.nix"
+  ];
+
+  nix.useSandbox = "relaxed";
+
+  nix.maxJobs = 1;
+
+  nix.binaryCaches = [
+    "https://cache.nixos.org/"
+    "https://build.daiseelabs.com"
+  ];
+
+  nix.binaryCachePublicKeys = [
+    "build.daiseelabs.com-1:dcDJ5/wXMie1xvW/o5TfedvVIqKG77i3dpKfamBJg8M="
+  ];
+
+  nixpkgs.overlays = [
+    (import "${integrityPath}/overlay.nix")
   ];
 
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+
+  # Better responsiveness during builds!
+  boot.kernel.sysctl."vm.swappiness" = 10;
+  zramSwap = {
+    enable = true;
+    memoryPercent = 40;
+  };
+  fileSystems."/".options = [ "noatime" ];
+  fileSystems."/boot".options = [ "noatime" ];
+  services.fstrim.enable = true;
+  nix.daemonNiceLevel = 5;
 
   # Tell nixos we have a LUKS encrypted partition that needs to be
   # decrypted before we can access any LVM partitions.
@@ -29,6 +59,8 @@ in {
       name = "root";
       device = "/dev/nvme0n1p2";
       preLVM = true;
+      # Enable TRIM, lose some deniability
+      allowDiscards = true;
     }
   ];
 
@@ -80,6 +112,7 @@ in {
   # Set your time zone.
   time.timeZone = "Australia/Melbourne";
 
+  # Wireguard config start.
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.10/32" ];
     privateKeyFile = "/home/matt/wg-matt.key";
@@ -87,12 +120,50 @@ in {
       {
         endpoint = "build-vpn.daiseelabs.com:8083";
         publicKey = "DgFLw//BuU60Y+NMmnQ9D3kS1qDCqt4CB+Ep8yunZHs=";
-        allowedIPs = [ "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16" ];
+        allowedIPs = [ "10.200.0.0/16" "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16" ];
         persistentKeepalive = 25;
       }
     ];
   };
   networking.hosts."10.6.3.236" = [ "lisa-acme.daiseelabs.com" ];
+
+  systemd.services.network-reach-global = {
+    description = "Monitor access to global Internet";
+    # Wait for network manager to declare network "online"
+    # (whatever that means)
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    # preStart check to prevent dependency flapping
+    # No timeout, rely on TimeoutStartSec
+    preStart = ''
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+      /run/wrappers/bin/ping -c1 1.1.1.1
+    '';
+    script = ''
+      #!${pkgs.bash}/bin/bash
+      set -euo pipefail
+      while /run/wrappers/bin/ping -c1 -W2 1.1.1.1; do sleep 25s; done
+      exit 1
+    '';
+    serviceConfig = {
+      TimeoutStartSec = "1s";
+      RestartSec = "1s";
+      Restart = "always";
+      StartLimitInterval = "0";
+    };
+  };
+  # https://github.com/NixOS/nixpkgs/issues/30459
+  systemd.services.wireguard-wg0 = {
+    requires = [ "network-reach-global.service" ];
+    after = [ "network-reach-global.service" ];
+    # This feels backwards, but it's a useful way to
+    # restart a oneshot service. "after" does the
+    # expected thing.
+    # https://github.com/systemd/systemd/issues/2582
+    wantedBy = [ "network-reach-global.service" ];
+  };
+  # Wireguard config end.
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
@@ -107,6 +178,14 @@ in {
   ];
 
   nixpkgs.config.allowUnfree = true;
+
+  programs.integrity = {
+    enableWrapper = true;
+    enableInsecureNixBuilds = true;
+
+    # Current nixpkgs doesn't have ghc844, so use the known-good binary
+    package = (import "${integrityPath}/test.nix" {}).binary;
+  };
 
   # Power management for laptop.
   powerManagement.enable = true;
@@ -159,12 +238,15 @@ in {
   environment.variables.GDK_PIXBUF_MODULE_FILE = pkgs.lib.mkForce "${pkgs.librsvg.out}/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache";
 
   # Virtualbox.
-  virtualisation.virtualbox.host.enable = true;
+  # virtualisation.virtualbox.host.enable = true;
+
+  # Docker.
+  virtualisation.docker.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.extraUsers.matt = {
     createHome = true;
-    extraGroups = [ "wheel" "video" "audio" "disk" "networkmanager" "vboxusers" ];
+    extraGroups = [ "wheel" "video" "audio" "disk" "networkmanager" /*"vboxusers"*/ "integrity" "docker" ];
     group = "users";
     home = "/home/matt";
     isNormalUser = true;
