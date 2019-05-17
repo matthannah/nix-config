@@ -6,7 +6,7 @@
 
 let
   nixpkgs = import ./nixpkgs.nix;
-  integrityPath = "~/projects/lisa/test/integrity";
+  integrityPath = "/home/matt/projects/lisa/test/integrity";
 in {
   imports =
     [ # Include the results of the hardware scan.
@@ -66,7 +66,7 @@ in {
 
   # PG Container config start.
   containers.pg = {
-    bindMounts."/home" = { hostPath = "/data/pg-container"; isReadOnly = false; };
+    # bindMounts."/home" = { hostPath = "/data/pg-container"; isReadOnly = false; };
     privateNetwork = true;
     hostAddress = "192.168.100.10";
     localAddress = "192.168.100.11";
@@ -78,7 +78,7 @@ in {
         enableTCPIP = true;
         authentication = "host all all 0.0.0.0/0 trust";
       };
-      services.postgresql.package = pkgs.postgresql100;
+      services.postgresql.package = pkgs.postgresql_10;
       networking.firewall.allowedTCPPorts = [ 5432 ];
     };
   };
