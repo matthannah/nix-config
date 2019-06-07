@@ -64,7 +64,7 @@ in {
     }
   ];
 
-  # PG Container config start.
+  # Containers config start.
   containers.pg = {
     # bindMounts."/home" = { hostPath = "/data/pg-container"; isReadOnly = false; };
     privateNetwork = true;
@@ -83,11 +83,33 @@ in {
     };
   };
 
+  containers.es = {
+    privateNetwork = true;
+    hostAddress = "192.168.100.10";
+    localAddress = "192.168.100.12";
+    config = { config, lib, pkgs, ... }: with lib; {
+      boot.isContainer = true;
+      nixpkgs.config.allowUnfree = true;
+      networking.useDHCP = false;
+      services.elasticsearch = {
+        enable = true;
+        listenAddress = "0.0.0.0";
+        # transport must be on a loopback device
+        extraConf = ''
+          transport.host: localhost
+        '';
+        port = 9200;
+        tcp_port = 9300;
+      };
+      networking.firewall.allowedTCPPorts = [ 9200 9300 ];
+    };
+  };
+
   networking.nat.enable = true;
   networking.nat.internalInterfaces = [ "ve-+" ];
   networking.nat.externalInterface = "192.168.100.10";
   networking.networkmanager.unmanaged = [ "interface-name:ve-*" ];
-  # PG Container config end.
+  # Containers config end.
 
   hardware = {
     nvidia.modesetting.enable = true;
@@ -258,6 +280,6 @@ in {
   # compatible, in order to avoid breaking some software such as database
   # servers. You should change this only after NixOS release notes say you
   # should.
-  system.stateVersion = "18.09"; # Did you read the comment?
+  system.stateVersion = "19.03"; # Did you read the comment?
 
 }
