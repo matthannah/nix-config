@@ -101,7 +101,14 @@ in {
         port = 9200;
         tcp_port = 9300;
       };
-      networking.firewall.allowedTCPPorts = [ 9200 9300 ];
+
+      services.kibana = {
+        enable = true;
+        listenAddress = "0.0.0.0";
+        port = 5601;
+      };
+
+      networking.firewall.allowedTCPPorts = [ 9200 9300 5601 ];
     };
   };
 
@@ -191,6 +198,7 @@ in {
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     curl
+    exfat
     file
     git
     ncat
@@ -263,12 +271,12 @@ in {
   # virtualisation.virtualbox.host.enable = true;
 
   # Docker.
-  virtualisation.docker.enable = true;
+  # virtualisation.docker.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.extraUsers.matt = {
     createHome = true;
-    extraGroups = [ "wheel" "video" "audio" "disk" "networkmanager" /*"vboxusers"*/ "integrity" "docker" ];
+    extraGroups = [ "wheel" "video" "audio" "disk" "networkmanager" "integrity" /*"vboxusers" "docker"*/ ];
     group = "users";
     home = "/home/matt";
     isNormalUser = true;
