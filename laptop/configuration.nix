@@ -21,6 +21,10 @@ in {
   ];
 
   nix.useSandbox = "relaxed";
+  
+  nix.extraOptions = ''
+    narinfo-cache-negative-ttl = 120
+  '';
 
   nix.maxJobs = 1;
 
@@ -91,6 +95,7 @@ in {
       boot.isContainer = true;
       nixpkgs.config.allowUnfree = true;
       networking.useDHCP = false;
+      
       services.elasticsearch = {
         enable = true;
         listenAddress = "0.0.0.0";
@@ -149,7 +154,7 @@ in {
       {
         endpoint = "build-vpn.daiseelabs.com:8083";
         publicKey = "DgFLw//BuU60Y+NMmnQ9D3kS1qDCqt4CB+Ep8yunZHs=";
-        allowedIPs = [ "10.200.0.0/16" "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16" ];
+        allowedIPs = [ "10.200.0.0/16" "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16" "192.168.96.0/19" "192.168.128.0/19" "192.168.160.0/19" ];
         persistentKeepalive = 25;
       }
     ];
@@ -268,15 +273,15 @@ in {
   environment.variables.GDK_PIXBUF_MODULE_FILE = pkgs.lib.mkForce "${pkgs.librsvg.out}/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache";
 
   # Virtualbox.
-  # virtualisation.virtualbox.host.enable = true;
+  virtualisation.virtualbox.host.enable = true;
 
   # Docker.
-  # virtualisation.docker.enable = true;
+  virtualisation.docker.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.extraUsers.matt = {
     createHome = true;
-    extraGroups = [ "wheel" "video" "audio" "disk" "networkmanager" "integrity" /*"vboxusers" "docker"*/ ];
+    extraGroups = [ "wheel" "video" "audio" "disk" "networkmanager" "integrity" "vboxusers" "docker" ];
     group = "users";
     home = "/home/matt";
     isNormalUser = true;
