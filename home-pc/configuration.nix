@@ -17,6 +17,10 @@ in {
   nix.binaryCachePublicKeys = [
     "build.daiseelabs.com-1:dcDJ5/wXMie1xvW/o5TfedvVIqKG77i3dpKfamBJg8M="
   ];
+  nix.extraOptions = ''
+    narinfo-cache-negative-ttl = 120
+  '';
+  nix.maxJobs = 1;
 
   imports =
     [ # Include the results of the hardware scan.
@@ -28,7 +32,7 @@ in {
   boot.initrd.luks.devices = [
     {
       name = "root";
-      device = "/dev/sda3";
+      device = "/dev/disk/by-uuid/212e9d1a-47aa-4edf-9e5b-62c5018462dd";
       preLVM = true;
     }
   ];
@@ -37,34 +41,13 @@ in {
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # PG Container config start.
-  containers.pg = {
-    bindMounts."/home" = { hostPath = "/home/matt/pg-container-mount"; isReadOnly = false; };
-    privateNetwork = true;
-    hostAddress = "192.168.100.10";
-    localAddress = "192.168.100.11";
-    config = { config, lib, pkgs, ... }: with lib; {
-      boot.isContainer = true;
-      networking.useDHCP = false;
-      services.postgresql = {
-        enable = true;
-        enableTCPIP = true;
-        authentication = "host all all 0.0.0.0/0 trust";
-        package = pkgs.postgresql100;
-      };
-      networking.firewall.allowedTCPPorts = [ 5432 ];
-    };
-  };
-
-  networking.nat.enable = true;
-  networking.nat.internalInterfaces = ["ve-+"];
-  networking.nat.externalInterface = "192.168.100.10";
-  networking.networkmanager.unmanaged = [ "interface-name:ve-*" ];
-  # PG Container config end.
+  # Documentation man pages
+  documentation.dev.enable = true;  
 
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
   networking.networkmanager.enable = true;
+  networking.enableIPv6 = false;
 
   # Configure network proxy if necessary
   # networking.proxy.default = "http://user:password@proxy:port/";
@@ -79,11 +62,16 @@ in {
 
   # Set your time zone.
   time.timeZone = "Australia/Melbourne";
+  time.hardwareClockInLocalTime = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     coreutils
+    exfat
+    file
+    manpages
+    ntfs3g
     vim
   ];
 
@@ -95,7 +83,14 @@ in {
       {
         endpoint = "build-vpn.daiseelabs.com:8083";
         publicKey = "DgFLw//BuU60Y+NMmnQ9D3kS1qDCqt4CB+Ep8yunZHs=";
-        allowedIPs = [ "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16" ];
+        allowedIPs = [
+	  # build, dev
+          "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16"
+          # demo
+          "10.200.10.0/23"
+	  # unsure
+	  "192.168.96.0/19" "192.168.128.0/19" "192.168.160.0/19"
+        ];
         persistentKeepalive = 25;
       }
     ];
@@ -189,10 +184,12 @@ in {
     xfce.enable = true;
   };
 
+  virtualisation.docker.enable = true;
+
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.extraUsers.matt = {
     createHome = true;
-    extraGroups = ["wheel" "video" "audio" "disk" "networkmanager" "integrity" ];
+    extraGroups = ["wheel" "video" "audio" "disk" "networkmanager" "integrity" "docker"];
     group = "users";
     home = "/home/matt";
     isNormalUser = true;

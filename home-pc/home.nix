@@ -21,33 +21,37 @@ let
     '';
     destination = "/themes/robbyrussell.zsh-theme";
   };
+  unstable = import <unstable> {};
 in {
   home.packages = with pkgs; [
-    audacity
     curl
-    gimp
     git
     git-crypt
     gnumake
     gnupg
     google-chrome
+    haskellPackages."stylish-haskell"
+    haskellPackages.hlint
     htop
     networkmanagerapplet
     ncat
     oh-my-zsh
-    postgresql100
+    postgresql_10
     slack
     terminator
+    unstable.godot
+    unstable.woeusb
     unzip
     vlc
     vscode
     xclip
     xscreensaver
     zip
+    zoom-us
   ];
 
   home.file.".ghci".text = ''
-    :set prompt "\ESC[93mλ > \ESC[m"
+    :set prompt "\ESC[93mλ> \ESC[m"
   '';
 
   programs.zsh = {
@@ -70,6 +74,7 @@ in {
     userName = "Matt Hannah";
     userEmail = "matt.hannah@daisee.com";
     aliases.lg = "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit";
+    extraConfig.core.editor = "${pkgs.vim}/bin/vim";
   };
 
   services.gpg-agent = {
@@ -85,22 +90,6 @@ in {
   };
 
   services.unclutter.enable = true;
-
-  systemd.user.services.postgres-forward = {
-    Unit.Description = "Forward PostgreSQL connections on local socket to container";
-    Install.WantedBy = [ "graphical-session.target" ];
-    Service =
-      let
-        script = pkgs.writeShellScriptBin "postgres.sh" ''
-          rm -f ${socket}
-          exec ${pkgs.nmap}/bin/ncat -lkU ${socket} --sh-exec '${pkgs.nmap}/bin/ncat 192.168.100.11 5432'
-        '';
-        socket = "/tmp/.s.PGSQL.5432";
-      in {
-        ExecStart = "${pkgs.bash}/bin/bash ${script}/bin/postgres.sh";
-        ExecStopPost = "${pkgs.coreutils}/bin/rm -f ${socket}";
-      };
-  };
 
   programs.home-manager = {
     enable = true;
