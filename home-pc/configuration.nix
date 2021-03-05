@@ -5,17 +5,18 @@
 { config, pkgs, ... }:
 
 let
-  integrityPath = "/home/matt/projects/lisa/test/integrity";
+  unstable = import <unstable> {};
+  integrityPath = "/home/matt/projects/lisa.all/test/integrity";
 in {
   # Lisa integrity overlay.
   nixpkgs.overlays = [ (import "${integrityPath}/overlay.nix") ];
 
   nix.binaryCaches = [
     "https://cache.nixos.org/"
-    "https://build.daiseelabs.com"
+    # "https://build.daiseelabs.com"
   ];
   nix.binaryCachePublicKeys = [
-    "build.daiseelabs.com-1:dcDJ5/wXMie1xvW/o5TfedvVIqKG77i3dpKfamBJg8M="
+    # "build.daiseelabs.com-1:dcDJ5/wXMie1xvW/o5TfedvVIqKG77i3dpKfamBJg8M="
   ];
   nix.extraOptions = ''
     narinfo-cache-negative-ttl = 120
@@ -29,35 +30,42 @@ in {
       "${integrityPath}/module.nix"
     ];
 
-  boot.initrd.luks.devices = [
-    {
+  boot.initrd.luks.devices = {
+    root = {
       name = "root";
-      device = "/dev/disk/by-uuid/212e9d1a-47aa-4edf-9e5b-62c5018462dd";
+      device = "/dev/disk/by-uuid/1acae0be-6263-4118-9192-cbb102172b39";
       preLVM = true;
-    }
-  ];
-
+    };
+  };
+  
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
   # Documentation man pages
   documentation.dev.enable = true;  
-
+  
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-  networking.networkmanager.enable = true;
-  networking.enableIPv6 = false;
+
+  # The global useDHCP flag is deprecated, therefore explicitly set to false here.
+  # Per-interface useDHCP will be mandatory in the future, so this generated config
+  # replicates the default behaviour.
+  networking.useDHCP = false;
+  networking.interfaces.eno1.useDHCP = true;
 
   # Configure network proxy if necessary
   # networking.proxy.default = "http://user:password@proxy:port/";
   # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
+  networking.networkmanager.enable = true;
+  networking.enableIPv6 = false;
+
   # Select internationalisation properties.
-  # i18n = {
-  #   consoleFont = "Lat2-Terminus16";
-  #   consoleKeyMap = "us";
-  #   defaultLocale = "en_US.UTF-8";
+  # i18n.defaultLocale = "en_US.UTF-8";
+  # console = {
+  #   font = "Lat2-Terminus16";
+  #   keyMap = "us";
   # };
 
   # Set your time zone.
@@ -70,6 +78,7 @@ in {
     coreutils
     exfat
     file
+    libheif # HEIC Pictures
     manpages
     ntfs3g
     vim
@@ -85,7 +94,7 @@ in {
         publicKey = "DgFLw//BuU60Y+NMmnQ9D3kS1qDCqt4CB+Ep8yunZHs=";
         allowedIPs = [
 	  # build, dev
-          "10.100.0.0/24" "10.1.0.0/16" "10.2.0.0/16" "10.6.0.0/16"
+          "10.100.0.0/24" "10.1.0.0/16" "10.6.0.0/16"
           # demo
           "10.200.10.0/23"
 	  # unsure
@@ -95,6 +104,20 @@ in {
       }
     ];
   };
+
+  networking.wireguard.interfaces.wg1 = {
+    ips = [ "10.101.0.40/32" ];
+    privateKeyFile = "/home/matt/wg-matt-prod.key";
+    peers = [
+      {
+        publicKey = "qIc7ga58nKfsTADXmUseATUF5NKWeFqQAV9os1vn6mU=";
+        allowedIPs = [ "10.101.0.0/24" "10.3.0.0/16" "10.4.0.0/16" ];
+        endpoint = "13.238.76.249:8083";
+        persistentKeepalive = 25;
+      }
+    ];
+  };
+
   networking.hosts."10.6.3.236" = [ "lisa-acme.daiseelabs.com" ];
 
   systemd.services.network-reach-global = {
@@ -134,6 +157,17 @@ in {
     wantedBy = [ "network-reach-global.service" ];
   };
 
+  # https://github.com/NixOS/nixpkgs/issues/30459
+  systemd.services.wireguard-wg1 = {
+    requires = [ "network-reach-global.service" ];
+    after = [ "network-reach-global.service" ];
+    # This feels backwards, but it's a useful way to
+    # restart a oneshot service. "after" does the
+    # expected thing.
+    # https://github.com/systemd/systemd/issues/2582
+    wantedBy = [ "network-reach-global.service" ];
+  };
+
   # Wireguard config end.
 
   # Lisa integrity.
@@ -141,7 +175,7 @@ in {
     enableWrapper = true;
     enableInsecureNixBuilds = true;
 
-    package = (import "${integrityPath}/test.nix" {}).binary;
+    # package = (import "${integrityPath}/test.nix" {}).binary;
   };
 
   # Allow lisa integrity test container to run. Since it sets '__noChroot' to 'true'
@@ -150,7 +184,11 @@ in {
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
   # programs.mtr.enable = true;
-  # programs.gnupg.agent = { enable = true; enableSSHSupport = true; };
+  # programs.gnupg.agent = {
+  #   enable = true;
+  #   enableSSHSupport = true;
+  #   pinentryFlavor = "gnome3";
+  # };
 
   # List services that you want to enable:
 
@@ -184,7 +222,13 @@ in {
     xfce.enable = true;
   };
 
-  virtualisation.docker.enable = true;
+  # Tailscale VPN
+  services.tailscale.enable = true;
+
+  virtualisation.docker = {
+    enable = true;
+    package = unstable.docker;
+  };
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.extraUsers.matt = {
@@ -203,10 +247,13 @@ in {
     guest.enable = true;
   };
 
-  # This value determines the NixOS release with which your system is to be
-  # compatible, in order to avoid breaking some software such as database
-  # servers. You should change this only after NixOS release notes say you
-  # should.
-  system.stateVersion = "18.09"; # Did you read the comment?
+  # This value determines the NixOS release from which the default
+  # settings for stateful data, like file locations and database versions
+  # on your system were taken. It‘s perfectly fine and recommended to leave
+  # this value at the release version of the first install of this system.
+  # Before changing this value read the documentation for this option
+  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
+  system.stateVersion = "20.03"; # Did you read the comment?
 
 }
+
